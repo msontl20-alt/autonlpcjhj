@@ -12,6 +12,8 @@ import {
   Save,
   ChevronRight,
   Database,
+  RotateCcw,
+  RefreshCcw,
   LayoutDashboard
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -647,6 +649,47 @@ export default function App() {
     });
   };
 
+  const handleEditGrade = (criteria: string, newGrade: string) => {
+    if (!editingStudent) return;
+    const level = levelMapping[newGrade] || newGrade;
+    const possibleComments = parsedBank[criteria]?.[level] || [];
+    
+    setEditingStudent(prev => {
+      if (!prev) return null;
+      // When grade changes, find a comment from the bank for the new grade
+      let newComment = prev.individualComments[criteria];
+      if (possibleComments.length > 0) {
+        newComment = possibleComments[0];
+      }
+      
+      return {
+        ...prev,
+        originalGrades: { ...prev.originalGrades, [criteria]: newGrade },
+        individualComments: { ...prev.individualComments, [criteria]: newComment }
+      };
+    });
+  };
+
+  const handleNextSuggestion = (criteria: string) => {
+    if (!editingStudent) return;
+    const currentGrade = editingStudent.originalGrades[criteria];
+    const level = levelMapping[currentGrade] || currentGrade;
+    const suggestions = parsedBank[criteria]?.[level] || [];
+    
+    if (suggestions.length <= 1) return;
+    
+    const currentComment = editingStudent.individualComments[criteria];
+    const currentIndex = suggestions.indexOf(currentComment);
+    const nextIndex = (currentIndex + 1) % suggestions.length;
+    
+    handleEditIndividualComment(criteria, suggestions[nextIndex]);
+  };
+
+  const handleEditStudentInfo = (field: 'name' | 'studentId', value: string) => {
+    if (!editingStudent) return;
+    setEditingStudent(prev => prev ? { ...prev, [field]: value } : null);
+  };
+
   const regenerateGroupedForEditingStudent = () => {
     if (!editingStudent) return;
     const newGrouped = generateGroupedCommentsInternal(editingStudent.individualComments);
@@ -1211,9 +1254,21 @@ export default function App() {
                   <span className="text-white/40 text-sm font-medium tracking-widest uppercase">Student Profile</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="text-right hidden sm:block">
-                     <p className="text-lg font-bold text-blue-400 leading-tight">{editingStudent.name}</p>
-                     <p className="text-[10px] font-bold text-white/50 tracking-widest uppercase">{editingStudent.studentId || 'No ID'}</p>
+                  <div className="text-right hidden sm:block space-y-1">
+                    <input 
+                      type="text"
+                      value={editingStudent.name}
+                      onChange={(e) => handleEditStudentInfo('name', e.target.value)}
+                      className="bg-white/10 border border-white/20 rounded px-3 py-1 text-right text-sm font-bold text-blue-400 focus:outline-none focus:bg-white/20 transition-all w-48"
+                      placeholder="Họ và tên"
+                    />
+                    <input 
+                      type="text"
+                      value={editingStudent.studentId}
+                      onChange={(e) => handleEditStudentInfo('studentId', e.target.value)}
+                      className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right text-[10px] font-bold text-white/50 tracking-widest uppercase focus:outline-none focus:bg-white/10 transition-all w-32 block ml-auto"
+                      placeholder="Mã học sinh"
+                    />
                   </div>
                   <button onClick={closeEditModal} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
                     <X className="w-6 h-6" />
@@ -1240,22 +1295,37 @@ export default function App() {
                          spellCheck="true"
                        />
                     </div>
-                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
                       {['Tự chủ và tự học', 'Giao tiếp và hợp tác', 'Giải quyết vấn đề'].map(crit => (
-                        <div key={crit} className="space-y-2">
-                           <div className="flex justify-between items-center">
-                             <label className="text-[10px] font-black uppercase text-neutral-500">{crit}</label>
-                             <span className="text-[9px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-full">{editingStudent.originalGrades[crit] || 'N/A'}</span>
+                        <div key={crit} className="space-y-3 bg-white p-5 rounded-2xl border border-neutral-100 shadow-sm transition-all hover:shadow-md">
+                           <div className="flex justify-between items-center gap-2">
+                             <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider truncate">{crit}</label>
+                             <div className="flex items-center gap-1">
+                                {['T', 'Đ', 'C'].map(lvl => (
+                                  <button 
+                                    key={lvl}
+                                    onClick={() => handleEditGrade(crit, lvl)}
+                                    className={`w-6 h-6 rounded-md text-[9px] font-black flex items-center justify-center transition-all ${editingStudent.originalGrades[crit] === lvl ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-100' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'}`}
+                                  >
+                                    {lvl}
+                                  </button>
+                                ))}
+                                <button 
+                                  onClick={() => handleNextSuggestion(crit)}
+                                  className="w-6 h-6 rounded-md bg-neutral-50 text-neutral-400 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition-all border border-neutral-100"
+                                  title="Gợi ý câu khác"
+                                >
+                                  <RefreshCcw className="w-3 h-3" />
+                                </button>
+                             </div>
                            </div>
                            <textarea 
                              value={editingStudent.individualComments[crit] || ''}
                              onChange={(e) => handleEditIndividualComment(crit, e.target.value)}
-                             className="w-full h-32 p-4 text-xs font-medium rounded-2xl bg-white border border-neutral-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none leading-relaxed"
+                             className="w-full h-32 p-4 text-xs font-medium rounded-xl bg-neutral-50 border-none focus:ring-2 focus:ring-blue-500 outline-none resize-none leading-relaxed transition-all"
                              spellCheck="true"
                            />
                         </div>
                       ))}
-                    </div>
                   </div>
                 </div>
 
@@ -1272,31 +1342,63 @@ export default function App() {
                          spellCheck="true"
                        />
                     </div>
-                    <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4">
                       {['Ngôn ngữ', 'Tính toán', 'Khoa học', 'Thẩm mĩ', 'Thể chất'].map(crit => (
-                        <div key={crit} className="space-y-2">
-                           <div className="flex justify-between items-center">
-                             <label className="text-[10px] font-black uppercase text-neutral-500">{crit}</label>
-                             <span className="text-[9px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full">{editingStudent.originalGrades[crit] || 'N/A'}</span>
+                        <div key={crit} className="space-y-3 bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                           <div className="flex justify-between items-center gap-2">
+                             <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider truncate">{crit}</label>
+                             <div className="flex items-center gap-1">
+                                {['T', 'Đ', 'C'].map(lvl => (
+                                  <button 
+                                    key={lvl}
+                                    onClick={() => handleEditGrade(crit, lvl)}
+                                    className={`w-6 h-6 rounded-md text-[9px] font-black flex items-center justify-center transition-all ${editingStudent.originalGrades[crit] === lvl ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-100' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'}`}
+                                  >
+                                    {lvl}
+                                  </button>
+                                ))}
+                                <button 
+                                  onClick={() => handleNextSuggestion(crit)}
+                                  className="w-6 h-6 rounded-md bg-neutral-50 text-neutral-400 flex items-center justify-center hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-neutral-100"
+                                >
+                                  <RefreshCcw className="w-3 h-3" />
+                                </button>
+                             </div>
                            </div>
                            <textarea 
                              value={editingStudent.individualComments[crit] || ''}
                              onChange={(e) => handleEditIndividualComment(crit, e.target.value)}
-                             className="w-full h-32 p-4 text-[10px] font-medium rounded-2xl bg-white border border-neutral-200 focus:ring-2 focus:ring-emerald-500 outline-none resize-none leading-relaxed"
+                             className="w-full h-32 p-3 text-[10px] font-medium rounded-xl bg-neutral-50 border-none focus:ring-2 focus:ring-emerald-500 outline-none resize-none leading-relaxed transition-all"
                              spellCheck="true"
                            />
                         </div>
                       ))}
                       {gradeBlock === 'k345' && ['Công nghệ', 'Tin học'].map(crit => (
-                        <div key={crit} className="space-y-2">
-                           <div className="flex justify-between items-center">
-                             <label className="text-[10px] font-black uppercase text-neutral-500">{crit}</label>
-                             <span className="text-[9px] font-black bg-blue-500 text-white px-2 py-0.5 rounded-full">{editingStudent.originalGrades[crit] || 'N/A'}</span>
+                        <div key={crit} className="space-y-3 bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                           <div className="flex justify-between items-center gap-2">
+                             <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider truncate">{crit}</label>
+                             <div className="flex items-center gap-1">
+                                {['T', 'Đ', 'C'].map(lvl => (
+                                  <button 
+                                    key={lvl}
+                                    onClick={() => handleEditGrade(crit, lvl)}
+                                    className={`w-6 h-6 rounded-md text-[9px] font-black flex items-center justify-center transition-all ${editingStudent.originalGrades[crit] === lvl ? 'bg-blue-500 text-white shadow-sm ring-2 ring-blue-100' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'}`}
+                                  >
+                                    {lvl}
+                                  </button>
+                                ))}
+                                <button 
+                                  onClick={() => handleNextSuggestion(crit)}
+                                  className="w-6 h-6 rounded-md bg-neutral-50 text-neutral-400 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 transition-all border border-neutral-100"
+                                >
+                                  <RefreshCcw className="w-3 h-3" />
+                                </button>
+                             </div>
                            </div>
                            <textarea 
                              value={editingStudent.individualComments[crit] || ''}
                              onChange={(e) => handleEditIndividualComment(crit, e.target.value)}
-                             className="w-full h-32 p-4 text-[10px] font-medium rounded-2xl bg-white border border-neutral-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none leading-relaxed"
+                             className="w-full h-32 p-3 text-[10px] font-medium rounded-xl bg-neutral-50 border-none focus:ring-2 focus:ring-blue-500 outline-none resize-none leading-relaxed transition-all"
                              spellCheck="true"
                            />
                         </div>
@@ -1318,17 +1420,33 @@ export default function App() {
                          spellCheck="true"
                        />
                     </div>
-                    <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-5 gap-6">
+                    <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-5 gap-4">
                       {['Yêu nước', 'Nhân ái', 'Chăm chỉ', 'Trung thực', 'Trách nhiệm'].map(crit => (
-                        <div key={crit} className="space-y-2">
-                           <div className="flex justify-between items-center">
-                             <label className="text-[10px] font-black uppercase text-neutral-500">{crit}</label>
-                             <span className="text-[9px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-full">{editingStudent.originalGrades[crit] || 'N/A'}</span>
+                        <div key={crit} className="space-y-3 bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                           <div className="flex justify-between items-center gap-2">
+                             <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider truncate">{crit}</label>
+                             <div className="flex items-center gap-1">
+                                {['T', 'Đ', 'C'].map(lvl => (
+                                  <button 
+                                    key={lvl}
+                                    onClick={() => handleEditGrade(crit, lvl)}
+                                    className={`w-6 h-6 rounded-md text-[9px] font-black flex items-center justify-center transition-all ${editingStudent.originalGrades[crit] === lvl ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-100' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'}`}
+                                  >
+                                    {lvl}
+                                  </button>
+                                ))}
+                                <button 
+                                  onClick={() => handleNextSuggestion(crit)}
+                                  className="w-6 h-6 rounded-md bg-neutral-50 text-neutral-400 flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 transition-all border border-neutral-100"
+                                >
+                                  <RefreshCcw className="w-3 h-3" />
+                                </button>
+                             </div>
                            </div>
                            <textarea 
                              value={editingStudent.individualComments[crit] || ''}
                              onChange={(e) => handleEditIndividualComment(crit, e.target.value)}
-                             className="w-full h-32 p-4 text-[10px] font-medium rounded-2xl bg-white border border-neutral-200 focus:ring-2 focus:ring-rose-500 outline-none resize-none leading-relaxed"
+                             className="w-full h-32 p-3 text-[10px] font-medium rounded-xl bg-neutral-50 border-none focus:ring-2 focus:ring-rose-500 outline-none resize-none leading-relaxed transition-all"
                              spellCheck="true"
                            />
                         </div>
