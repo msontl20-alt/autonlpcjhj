@@ -1,0 +1,6 @@
+{
+  "name": "AutoComment - Student Assessment Tool",
+  "description": "An automated tool for teachers to generate and manage student competency and quality comments from Excel grade sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
